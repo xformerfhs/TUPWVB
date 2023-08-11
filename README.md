@@ -2,6 +2,8 @@
 
 Safely store secrets in config files, environment variables, and files
 
+Originally, this repository was located in the "dbsystel" organization. With their kind permission, I moved it to my space in August 2023. The [original repository](https://github.com/xformerfhs/TUPWVB) will no longer be maintained.
+
 ## Introduction
 
 In almost every project, secrets need to be stored: passwords, tokens, user names, you name it.
