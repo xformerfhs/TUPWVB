@@ -1,8 +1,8 @@
 ﻿# TUPW
 
-Safely store secrets in config files, environment variables, and files
-
 > 💡 Originally, this repository was located in the [dbsystel](https://github.com/dbsystel) organization. With their kind permission, I moved it to my space in August 2023. The [original repository](https://github.com/dbsystel/TUPWVB) is archived and no longer maintained.
+
+Safely store secrets in config files, environment variables, and files
 
 ## Introduction
 
