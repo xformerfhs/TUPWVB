@@ -103,7 +103,7 @@ Public NotInheritable Class ByteArrayBlinding
 
       Dim sourceLength As Integer = sourceBytes.Length
 
-      Dim packedSourceLength As Byte() = PackedUnsignedInteger.FromInteger(sourceLength)
+      Dim packedSourceLength As Byte() = CompressedInteger.FromInteger(sourceLength)
       Dim packedSourceLengthLength As Integer = packedSourceLength.Length
 
       ' The prefix and postfix blinding lengths need to be calculated.
@@ -167,7 +167,7 @@ Public NotInheritable Class ByteArrayBlinding
       RequireNonNull(sourceBytes, NameOf(sourceBytes))
 
       If sourceBytes.Length > LENGTHS_LENGTH Then
-         Dim packedNumberLength As Integer = PackedUnsignedInteger.GetExpectedLength(sourceBytes, INDEX_SOURCE_PACKED_LENGTH)
+         Dim packedNumberLength As Integer = CompressedInteger.GetExpectedLength(sourceBytes, INDEX_SOURCE_PACKED_LENGTH)
 
          ' No. of bytes to skip is the blinding prefix length plus the two length bytes plus the source length
          Dim prefixBlindingLength As Integer = LENGTHS_LENGTH + sourceBytes(INDEX_SOURCE_PREFIX_LENGTH) + packedNumberLength
@@ -175,7 +175,7 @@ Public NotInheritable Class ByteArrayBlinding
          Dim postfixBlindingLength As Integer = sourceBytes(INDEX_SOURCE_POSTFIX_LENGTH)
 
          Dim totalBlindingsLength As Integer = prefixBlindingLength + postfixBlindingLength
-         Dim dataLength As Integer = PackedUnsignedInteger.ToInteger(sourceBytes, INDEX_SOURCE_PACKED_LENGTH)
+         Dim dataLength As Integer = CompressedInteger.ToInteger(sourceBytes, INDEX_SOURCE_PACKED_LENGTH)
 
          ' The largest number in the following addition can only be just over 1,073,741,823
          ' This can never overflow into negative values

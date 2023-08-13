@@ -19,10 +19,11 @@
 '
 ' Author: Frank Schwab
 '
-' Version: 1.0.0
+' Version: 2.0.0
 '
 ' Change history:
 '    2020-04-21: V1.0.0: Created.
+'    2023-08-13: V2.0.0: Much simpler redesign.
 '
 
 Option Strict On
@@ -31,34 +32,11 @@ Option Explicit On
 ''' <summary>
 ''' Converts integers from and to an unsigned packed byte array
 ''' </summary>
-Public NotInheritable Class PackedUnsignedInteger
+Public NotInheritable Class CompressedInteger
 #Region "Private constants"
    '******************************************************************
    ' Private constants
    '******************************************************************
-
-   '
-   ' Constants for conversion
-   '
-   Private Const START_1_BYTE_VALUE As Integer = 0                '       &H00
-   Private Const START_2_BYTE_VALUE As Integer = 64               '       &H40
-   Private Const START_3_BYTE_VALUE As Integer = 16448            '     &H4040
-   Private Const START_4_BYTE_VALUE As Integer = 4210752          '   &H404040
-   Private Const START_TOO_LARGE_VALUE As Integer = 1077952576    ' &H40404040
-
-   '
-   ' Constants for masks
-   '
-   Private Const NO_LENGTH_MASK_FOR_BYTE As Byte = &H3F
-   Private Const BYTE_MASK_FOR_INTEGER As Integer = &HFF
-
-   '
-   ' Constants for length indicators
-   '
-   '   Private Const LENGTH_1_MASK As Byte = 0
-   Private Const LENGTH_2_MASK As Byte = &H40
-   Private Const LENGTH_3_MASK As Byte = &H80
-   Private Const LENGTH_4_MASK As Byte = &HC0
 
    '
    ' Constant for calculation
@@ -68,6 +46,21 @@ Public NotInheritable Class PackedUnsignedInteger
    ' It is not possible to write a byte constant in VB.
    '
    Private Const ONE_AS_BYTE As Byte = 1US
+
+   Private Const OFFSET_VALUE As Byte = &H40
+
+   Private Const MAX_ALLOWED_INTEGER As Integer = &H40404040 - 1
+
+   ' Constants for masks
+
+   Private Const NO_LENGTH_MASK_FOR_BYTE As Byte = OFFSET_VALUE - 1
+   Private Const BYTE_MASK_FOR_INTEGER As Integer = &HFF
+
+   ' Array manipulation constants
+
+   Private Const RESULT_ARRAY_LENGTH As Integer = 4
+   Private Const RESULT_MAX_INDEX As Integer = RESULT_ARRAY_LENGTH - 1
+   Private Const LENGTH_BITS_SHIFT_VALUE As Integer = 6
 #End Region
 
 #Region "Public methods"
@@ -86,60 +79,38 @@ Public NotInheritable Class PackedUnsignedInteger
    ''' <exception cref="ArgumentException">Thrown if <paramref name="anInteger"/> has not a value between 0 and 1,077,952,575 (inclusive)</exception>
    ''' <returns>packed unsigned integer byte array with integer as value</returns>
    Public Shared Function FromInteger(anInteger As Integer) As Byte()
-      Dim result As Byte()
-      Dim intermediateInteger As Integer
+      If anInteger < 0 Then _
+         Throw New ArgumentException("Integer must not be negative")
 
-      Select Case anInteger
-         Case < START_1_BYTE_VALUE
-            Throw New ArgumentException("Integer must not be negative")
+      If anInteger > MAX_ALLOWED_INTEGER Then _
+         Throw New ArgumentException("Integer too large for packed integer")
 
-         Case < START_2_BYTE_VALUE
-            result = (New Byte(0 To 0) {CByte(anInteger)})
+      Dim result As Byte() = New Byte(0 To RESULT_MAX_INDEX) {}
 
-         Case < START_3_BYTE_VALUE
-            result = New Byte(0 To 1) {}
+      Dim temp As Integer = anInteger
+      Dim actIndex As Integer = RESULT_MAX_INDEX
 
-            intermediateInteger = anInteger - START_2_BYTE_VALUE
+      While temp >= OFFSET_VALUE
+         Dim b As Integer = temp And BYTE_MASK_FOR_INTEGER
 
-            result(1) = CByte(intermediateInteger And BYTE_MASK_FOR_INTEGER)
+         temp >>= 8
 
-            intermediateInteger >>= 8
-            result(0) = (LENGTH_2_MASK Or CByte(intermediateInteger))
+         If b >= OFFSET_VALUE Then
+            b -= OFFSET_VALUE
+         Else
+            b += 256 - OFFSET_VALUE
+            temp -= 1
+         End If
 
-         Case < START_4_BYTE_VALUE
-            result = New Byte(0 To 2) {}
+         result(actIndex) = CByte(b)
 
-            intermediateInteger = anInteger - START_3_BYTE_VALUE
+         actIndex -= 1
+      End While
 
-            result(2) = CByte(intermediateInteger And BYTE_MASK_FOR_INTEGER)
+      'Add length flag
+      result(actIndex) = CByte(temp Or (RESULT_MAX_INDEX - actIndex) << LENGTH_BITS_SHIFT_VALUE)
 
-            intermediateInteger >>= 8
-            result(1) = CByte(intermediateInteger And BYTE_MASK_FOR_INTEGER)
-
-            intermediateInteger >>= 8
-            result(0) = (LENGTH_3_MASK Or CByte(intermediateInteger))
-
-         Case < START_TOO_LARGE_VALUE
-            result = New Byte(0 To 3) {}
-
-            intermediateInteger = anInteger - START_4_BYTE_VALUE
-
-            result(3) = CByte(intermediateInteger And BYTE_MASK_FOR_INTEGER)
-
-            intermediateInteger >>= 8
-            result(2) = CByte(intermediateInteger And BYTE_MASK_FOR_INTEGER)
-
-            intermediateInteger >>= 8
-            result(1) = CByte(intermediateInteger And BYTE_MASK_FOR_INTEGER)
-
-            intermediateInteger >>= 8
-            result(0) = (LENGTH_4_MASK Or CByte(intermediateInteger))
-
-         Case Else
-            Throw New ArgumentException("Integer too large for packed integer")
-      End Select
-
-      Return result
+      Return ArrayHelper.CopyOf(result, actIndex, RESULT_ARRAY_LENGTH - actIndex)
    End Function
 
    ''' <summary>
@@ -151,41 +122,24 @@ Public NotInheritable Class PackedUnsignedInteger
    Public Shared Function ToInteger(arrayWithPackedNumber As Byte(), startIndex As Integer) As Integer
       RequireNonNull(arrayWithPackedNumber, NameOf(arrayWithPackedNumber))
 
-      Dim result As Integer
+      Dim arrayLength As Integer = arrayWithPackedNumber.Length
+
+      If arrayLength = 0 Then _
+         Throw New ArgumentException("Array must have a length greater 0")
 
       Dim expectedLength As Integer = GetExpectedLengthWithoutCheck(arrayWithPackedNumber, startIndex)
 
-      If (startIndex + expectedLength) <= arrayWithPackedNumber.Length Then
-         Select Case expectedLength
-            Case 1
-               result = (arrayWithPackedNumber(startIndex) And NO_LENGTH_MASK_FOR_BYTE)
+      If startIndex + expectedLength > arrayLength Then _
+         Throw New ArgumentException("Array is too short for packed number")
 
-            Case 2
-               result = ((CInt(arrayWithPackedNumber(startIndex) And NO_LENGTH_MASK_FOR_BYTE) << 8) Or
-                       arrayWithPackedNumber(startIndex + 1)) +
-                     START_2_BYTE_VALUE
+      ' Decompress the byte array
+      Dim temp As Integer = arrayWithPackedNumber(startIndex) And NO_LENGTH_MASK_FOR_BYTE
 
-            Case 3
-               result = ((((CInt(arrayWithPackedNumber(startIndex) And NO_LENGTH_MASK_FOR_BYTE) << 8) Or
-                      arrayWithPackedNumber(startIndex + 1)) << 8) Or
-                      arrayWithPackedNumber(startIndex + 2)) +
-                     START_3_BYTE_VALUE
+      For i As Integer = startIndex + 1 To startIndex + expectedLength - 1
+         temp = ((temp << 8) Or arrayWithPackedNumber(i)) + OFFSET_VALUE
+      Next i
 
-
-            Case 4
-               result = ((((((CInt(arrayWithPackedNumber(startIndex) And NO_LENGTH_MASK_FOR_BYTE) << 8) Or
-                      arrayWithPackedNumber(startIndex + 1)) << 8) Or
-                      arrayWithPackedNumber(startIndex + 2)) << 8) Or
-                      arrayWithPackedNumber(startIndex + 3)) +
-                     START_4_BYTE_VALUE
-
-               ' There is no "else" case as all possible values of "expectedLength" are covered
-         End Select
-      Else
-         Throw New ArgumentException("Array too short for packed unsigned integer")
-      End If
-
-      Return result
+      Return temp
    End Function
 
    ''' <summary>

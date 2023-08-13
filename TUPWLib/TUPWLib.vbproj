@@ -104,10 +104,15 @@
     <Compile Include="Crypto\RandomPadding.vb" />
     <Compile Include="Crypto\SecurePseudoRandomNumberGenerator.vb" />
     <Compile Include="Crypto\SplitKeyEncryption.vb" />
+    <Compile Include="My Project\Application.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="Numbers\BitManipulationHelper.vb" />
     <Compile Include="Numbers\BitwiseIntegerConverter.vb" />
-    <Compile Include="Numbers\PackedUnsignedInteger.vb" />
+    <Compile Include="Numbers\CompressedInteger.vb" />
     <Compile Include="Numbers\FunctionValueRangeMapper.vb" />
     <Compile Include="Numbers\SimpleHasher.vb" />
     <Compile Include="Numbers\SimplePseudoRandomNumberGenerator.vb" />
@@ -126,6 +131,12 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>
